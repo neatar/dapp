@@ -1,4 +1,4 @@
-/target
-/out
-/neardev
-.secrets
+target
+out
+neardev
+
