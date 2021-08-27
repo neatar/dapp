@@ -1,0 +1,9 @@
+[advisories]
+# warn for categories of informational advisories
+informational_warnings = [
+    "unmaintained",
+    "unsound",
+]
+
+[target]
+arch = "wasm32"
