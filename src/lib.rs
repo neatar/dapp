@@ -1,155 +1,326 @@
-//! This contract implements simple counter backed by storage on blockchain.
-//!
-//! The contract provides methods to [increment] / [decrement] counter and
-//! [get it's current value][get_num] or [reset].
-//!
-//! [increment]: struct.Counter.html#method.increment
-//! [decrement]: struct.Counter.html#method.decrement
-//! [get_num]: struct.Counter.html#method.get_num
-//! [reset]: struct.Counter.html#method.reset
+mod identicon;
 
-use near_sdk::borsh;
-use near_sdk::borsh::BorshDeserialize;
-use near_sdk::borsh::BorshSerialize;
-use near_sdk::env;
-use near_sdk::near_bindgen;
-use near_sdk::setup_alloc;
-
-setup_alloc!();
-
-/// Add the following attributes
-/// to prepare your code for serialization and invocation on the blockchain
-/// More built-in Rust attributes here: https://doc.rust-lang.org/reference/attributes.html#built-in-attributes-index
-#[near_bindgen]
-#[derive(Default, BorshDeserialize, BorshSerialize)]
-pub struct Counter {
-    // See more data types at https://doc.rust-lang.org/book/ch03-02-data-types.html
-    val: i8, // i8 is signed. unsigned integers are also available: u8, u16, u32, u64, u128
-}
+use near_contract_standards::non_fungible_token::metadata::{
+    NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
+};
+use near_contract_standards::non_fungible_token::{hash_account_id, NonFungibleToken};
+use near_contract_standards::non_fungible_token::{Token, TokenId};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::collections::LazyOption;
+use near_sdk::json_types::ValidAccountId;
+use near_sdk::{
+    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise, PromiseOrValue,
+};
+use std::convert::TryFrom;
+use std::convert::TryInto;
 
 #[near_bindgen]
-impl Counter {
-    /// Returns 8-bit signed integer of the counter value.
-    ///
-    /// This must match the type from our struct's 'val' defined above.
-    ///
-    /// Note, the parameter is `&self` (without being mutable) meaning it doesn't modify state.
-    /// In the frontend (/src/main.js) this is added to the "viewMethods" array
-    /// using near-cli we can call this by:
-    ///
-    /// ```bash
-    /// near view counter.YOU.testnet get_num
-    /// ```
-    pub fn get_num(&self) -> i8 {
-        self.val
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+pub struct Contract {
+    token_last_id: u128,
+    tokens: NonFungibleToken,
+    metadata: LazyOption<NFTContractMetadata>,
+}
+
+const DATA_IMAGE_SVG_NEAR_ICON: &str = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 288 288'%3E%3Cg id='l' data-name='l'%3E%3Cpath d='M187.58,79.81l-30.1,44.69a3.2,3.2,0,0,0,4.75,4.2L191.86,103a1.2,1.2,0,0,1,2,.91v80.46a1.2,1.2,0,0,1-2.12.77L102.18,77.93A15.35,15.35,0,0,0,90.47,72.5H87.34A15.34,15.34,0,0,0,72,87.84V201.16A15.34,15.34,0,0,0,87.34,216.5h0a15.35,15.35,0,0,0,13.08-7.31l30.1-44.69a3.2,3.2,0,0,0-4.75-4.2L96.14,186a1.2,1.2,0,0,1-2-.91V104.61a1.2,1.2,0,0,1,2.12-.77l89.55,107.23a15.35,15.35,0,0,0,11.71,5.43h3.13A15.34,15.34,0,0,0,216,201.16V87.84A15.34,15.34,0,0,0,200.66,72.5h0A15.35,15.35,0,0,0,187.58,79.81Z'/%3E%3C/g%3E%3C/svg%3E";
+
+#[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey {
+    NonFungibleToken,
+    Metadata,
+    TokenMetadata,
+    Enumeration,
+    Approval,
+}
+
+#[near_bindgen]
+impl Contract {
+    #[init]
+    pub fn new() -> Self {
+        assert!(!env::state_exists(), "Already initialized");
+        let owner_id = ValidAccountId::try_from(env::signer_account_id()).unwrap();
+        Self {
+            token_last_id: 0,
+            tokens: NonFungibleToken::new(
+                StorageKey::NonFungibleToken,
+                owner_id,
+                Some(StorageKey::TokenMetadata),
+                Some(StorageKey::Enumeration),
+                Some(StorageKey::Approval),
+            ),
+            metadata: LazyOption::new(
+                StorageKey::Metadata,
+                Some(&NFTContractMetadata {
+                    spec: NFT_METADATA_SPEC.to_string(),
+                    name: "Avatar for Web3".to_string(),
+                    symbol: "AVATAR".to_string(),
+                    icon: Some(DATA_IMAGE_SVG_NEAR_ICON.to_string()),
+                    base_uri: None,
+                    reference: None,
+                    reference_hash: None,
+                }),
+            ),
+        }
     }
 
-    /// Increment the counter.
-    ///
-    /// Note, the parameter is "&mut self" as this function modifies state.
-    /// In the frontend (/src/main.js) this is added to the "changeMethods" array
-    /// using near-cli we can call this by:
-    ///
-    /// ```bash
-    /// near call counter.YOU.testnet increment --accountId donation.YOU.testnet
-    /// ```
-    pub fn increment(&mut self) {
-        // note: adding one like this is an easy way to accidentally overflow
-        // real smart contracts will want to have safety checks
-        self.val += 1;
-        let log_message = format!("Increased number to {}", self.val);
-        env::log(log_message.as_bytes());
-        after_counter_change();
+    pub fn avatar_of(self, account_id: ValidAccountId) -> String {
+        let list = self.tokens.nft_tokens_for_owner(account_id, None, None);
+        if list.is_empty() {
+            return String::new();
+        }
+        list.first()
+            .cloned()
+            .unwrap()
+            .metadata
+            .unwrap()
+            .media
+            .unwrap()
     }
 
-    /// Decrement (subtract from) the counter.
-    ///
-    /// In (/src/main.js) this is also added to the "changeMethods" array
-    /// using near-cli we can call this by:
-    ///
-    /// ```bash
-    /// near call counter.YOU.testnet decrement --accountId donation.YOU.testnet
-    /// ```
-    pub fn decrement(&mut self) {
-        // note: subtracting one like this is an easy way to accidentally overflow
-        // real smart contracts will want to have safety checks
-        self.val -= 1;
-        let log_message = format!("Decreased number to {}", self.val);
-        env::log(log_message.as_bytes());
-        after_counter_change();
+    #[payable]
+    pub fn avatar_create(&mut self) -> Token {
+        let owner_id = env::signer_account_id().try_into().unwrap();
+        self.avatar_create_for(owner_id)
     }
 
-    /// Reset to zero.
-    pub fn reset(&mut self) {
-        self.val = 0;
-        // Another way to log is to cast a string into bytes, hence "b" below:
-        env::log(b"Reset counter to zero");
+    #[payable]
+    pub fn avatar_create_for(&mut self, owner_id: ValidAccountId) -> Token {
+        let data_image = format!(
+            "data:image/svg+xml;base64,{}",
+            identicon::make(&hash_account_id(&owner_id.clone().into()))
+        );
+        self.tokens.owner_id = env::signer_account_id(); // FIXME
+        let token = self.tokens.mint(
+            self.token_last_id.to_string(),
+            owner_id,
+            Some(TokenMetadata {
+                title: None,
+                description: None,
+                media: Some(data_image),
+                media_hash: None,
+                copies: None,
+                issued_at: None,
+                expires_at: None,
+                starts_at: None,
+                updated_at: None,
+                extra: None,
+                reference: None,
+                reference_hash: None,
+            }),
+        );
+        self.token_last_id += 1;
+        token
     }
 }
 
-/// Unlike the struct's functions above
-/// this function cannot use attributes #[derive(…)] or #[near_bindgen]
-/// any attempts will throw helpful warnings upon 'cargo build'
-/// while this function cannot be invoked directly on the blockchain, it can be called from an invoked function
-fn after_counter_change() {
-    // show helpful warning that i8 (8-bit signed integer) will overflow above 127 or below -128
-    env::log("Make sure you don't overflow, my friend.".as_bytes());
+near_contract_standards::impl_non_fungible_token_core!(Contract, tokens);
+near_contract_standards::impl_non_fungible_token_approval!(Contract, tokens);
+near_contract_standards::impl_non_fungible_token_enumeration!(Contract, tokens);
+
+#[near_bindgen]
+impl NonFungibleTokenMetadataProvider for Contract {
+    fn nft_metadata(&self) -> NFTContractMetadata {
+        self.metadata.get().unwrap()
+    }
 }
 
-/*
- * the rest of this file sets up unit tests
- * to run these, the command will be:
- * cargo test --package rust-counter-tutorial -- --nocapture
- * Note: 'rust-counter-tutorial' comes from cargo.toml's 'name' key
- */
-
-// use the attribute below for unit tests
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
-    use near_sdk::test_utils::accounts;
-    use near_sdk::test_utils::VMContextBuilder;
+    use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::testing_env;
     use near_sdk::MockedBlockchain;
 
-    // part of writing unit tests is setting up a mock context
-    fn context() -> VMContextBuilder {
+    const MINT_STORAGE_COST: u128 = 22650000000000000000000; // 0.02265
+
+    fn get_context(predecessor_account_id: ValidAccountId) -> VMContextBuilder {
         let mut builder = VMContextBuilder::new();
-        builder.signer_account_id(accounts(0));
+        builder
+            .current_account_id(accounts(0))
+            .signer_account_id(predecessor_account_id.clone())
+            .predecessor_account_id(predecessor_account_id);
         builder
     }
 
-    // mark individual unit tests with #[test] for them to be registered and fired
     #[test]
-    fn increment() {
-        // set up the mock context into the testing environment
-        testing_env!(context().build());
-        // instantiate a contract variable with the counter at zero
-        let mut contract = Counter::default();
-        contract.increment();
-        println!("Value after increment: {}", contract.get_num());
-        // confirm that we received 1 when calling get_num
-        assert_eq!(1, contract.get_num());
+    fn test_new() {
+        let mut context = get_context(accounts(1));
+        testing_env!(context.build());
+        let contract = Contract::new();
+        testing_env!(context.is_view(true).build());
+        assert_eq!(contract.nft_token("1".to_string()), None);
     }
 
     #[test]
-    fn decrement() {
-        testing_env!(context().build());
-        let mut contract = Counter::default();
-        contract.decrement();
-        println!("Value after decrement: {}", contract.get_num());
-        // confirm that we received -1 when calling get_num
-        assert_eq!(-1, contract.get_num());
+    #[should_panic(expected = "The contract is not initialized")]
+    fn test_default() {
+        let context = get_context(accounts(1));
+        testing_env!(context.build());
+        let _contract = Contract::default();
     }
 
     #[test]
-    fn increment_and_reset() {
-        testing_env!(context().build());
-        let mut contract = Counter::default();
-        contract.increment();
-        contract.reset();
-        println!("Value after reset: {}", contract.get_num());
-        // confirm that we received -1 when calling get_num
-        assert_eq!(0, contract.get_num());
+    fn test_avatar_create() {
+        let mut context = get_context(accounts(0));
+        testing_env!(context.build());
+        let mut contract = Contract::new();
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(0))
+            .signer_account_id(accounts(0))
+            .build());
+
+        let token_id = "0".to_string();
+        let token = contract.avatar_create();
+        assert_eq!(token.token_id, token_id);
+        assert_eq!(token.owner_id, accounts(0).to_string());
+        assert_eq!(token.metadata.unwrap().media.unwrap().len(), 1750);
+        assert_eq!(token.approved_account_ids.unwrap(), HashMap::new());
+    }
+
+    #[test]
+    fn test_transfer() {
+        let mut context = get_context(accounts(0));
+        testing_env!(context.build());
+        let mut contract = Contract::new();
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(0))
+            .build());
+        let token_id = "0".to_string();
+        contract.avatar_create();
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(1)
+            .predecessor_account_id(accounts(0))
+            .build());
+        contract.nft_transfer(accounts(1), token_id.clone(), None, None);
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .account_balance(env::account_balance())
+            .is_view(true)
+            .attached_deposit(0)
+            .build());
+        if let Some(token) = contract.nft_token(token_id.clone()) {
+            assert_eq!(token.token_id, token_id);
+            assert_eq!(token.owner_id, accounts(1).to_string());
+            assert_eq!(token.metadata.unwrap().media.unwrap().len(), 1750);
+            assert_eq!(token.approved_account_ids.unwrap(), HashMap::new());
+        } else {
+            panic!("token not correctly created, or not found by nft_token");
+        }
+    }
+
+    #[test]
+    fn test_approve() {
+        let mut context = get_context(accounts(0));
+        testing_env!(context.build());
+        let mut contract = Contract::new();
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(0))
+            .build());
+        let token_id = "0".to_string();
+        contract.avatar_create();
+
+        // alice approves bob
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(150000000000000000000)
+            .predecessor_account_id(accounts(0))
+            .build());
+        contract.nft_approve(token_id.clone(), accounts(1), None);
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .account_balance(env::account_balance())
+            .is_view(true)
+            .attached_deposit(0)
+            .build());
+        assert!(contract.nft_is_approved(token_id, accounts(1), Some(1)));
+    }
+
+    #[test]
+    fn test_revoke() {
+        let mut context = get_context(accounts(0));
+        testing_env!(context.build());
+        let mut contract = Contract::new();
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(0))
+            .build());
+        let token_id = "0".to_string();
+        contract.avatar_create();
+
+        // alice approves bob
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(150000000000000000000)
+            .predecessor_account_id(accounts(0))
+            .build());
+        contract.nft_approve(token_id.clone(), accounts(1), None);
+
+        // alice revokes bob
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(1)
+            .predecessor_account_id(accounts(0))
+            .build());
+        contract.nft_revoke(token_id.clone(), accounts(1));
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .account_balance(env::account_balance())
+            .is_view(true)
+            .attached_deposit(0)
+            .build());
+        assert!(!contract.nft_is_approved(token_id, accounts(1), None));
+    }
+
+    #[test]
+    fn test_revoke_all() {
+        let mut context = get_context(accounts(0));
+        testing_env!(context.build());
+        let mut contract = Contract::new();
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(0))
+            .build());
+        let token_id = "0".to_string();
+        contract.avatar_create();
+
+        // alice approves bob
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(150000000000000000000)
+            .predecessor_account_id(accounts(0))
+            .build());
+        contract.nft_approve(token_id.clone(), accounts(1), None);
+
+        // alice revokes bob
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(1)
+            .predecessor_account_id(accounts(0))
+            .build());
+        contract.nft_revoke_all(token_id.clone());
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .account_balance(env::account_balance())
+            .is_view(true)
+            .attached_deposit(0)
+            .build());
+        assert!(!contract.nft_is_approved(token_id, accounts(1), Some(1)));
     }
 }
