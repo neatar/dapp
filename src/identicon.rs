@@ -8,7 +8,9 @@ const HALF_SVG: i32 = 32;
 pub const FOREGROUND_COLOR: [u8; 4] = [238, 238, 238, 255];
 
 pub fn make(into_id: &[u8]) -> String {
-    base64::encode(svg_from_vec(&into_id, HALF_SVG).to_string())
+    svg_from_vec(&into_id, HALF_SVG)
+        .to_string()
+        .replace("\n", "")
 }
 
 /// Function to choose the coloring scheme based on value d.
@@ -323,4 +325,15 @@ pub fn get_colors_from_vec(into_id: &[u8]) -> Vec<[u8; 4]> {
     }
 
     my_colors
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use crate::identicon::make;
+
+    #[test]
+    fn test_make() {
+        let actual = make(&[1]);
+        assert_eq!("<svg viewBox=\"-32 -32 64 64\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"0\" cy=\"0\" fill=\"#eeeeee\" r=\"32\" stroke=\"none\"/><circle cx=\"0\" cy=\"-24\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"-12\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"-18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"-12\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"-6\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"0\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"12\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"6\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"24\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"12\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"12\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"6\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"0\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"-12\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"-6\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"-18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"0\" fill=\"#5e3c77\" r=\"5\" stroke=\"none\"/></svg>", actual);
+    }
 }

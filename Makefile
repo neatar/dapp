@@ -57,6 +57,7 @@ out/main.wasm:
 build:\
 out/main.wasm
 rebuild: clean-out build
+redeploy: deploy-delete deploy-new
 
 deploy: rebuild
 	near dev-deploy
@@ -66,11 +67,23 @@ deploy-delete: neardev
 	near delete $(shell cat neardev/dev-account) ${NEAR_DEV_ACCOUNT}
 	rm -fr neardev
 
+nft_metadata:
+	near view $(shell cat neardev/dev-account) nft_metadata
+nft_tokens:
+	near view $(shell cat neardev/dev-account) nft_tokens
+nft_tokens_for_owner:
+	near view $(shell cat neardev/dev-account) nft_tokens_for_owner '{"account_id": "ilyar.testnet", "from_index": "0", "limit": 50}'
 view_avatar_of_me:
 	near view $(shell cat neardev/dev-account) avatar_of '{"account_id": "ilyar.testnet"}'
 view_avatar_of_tb:
 	near view $(shell cat neardev/dev-account) avatar_of '{"account_id": "tb.testnet"}'
+call_avatar_create: call_avatar_create_me call_avatar_create_for_beta_tester
 call_avatar_create_me:
 	near --account_id ${NEAR_DEV_ACCOUNT} call $(shell cat neardev/dev-account) avatar_create --amount 1
-call_avatar_create_for_tb:
+# 0.02401721 - 0.0016 = 0.02241721
+call_avatar_create_for_beta_tester:
 	near --account_id ${NEAR_DEV_ACCOUNT} call $(shell cat neardev/dev-account) avatar_create_for '{"owner_id":"tb.testnet"}' --amount 1
+	near --account_id ${NEAR_DEV_ACCOUNT} call $(shell cat neardev/dev-account) avatar_create_for '{"owner_id":"jondou42.testnet"}' --amount 1
+
+#	near --account_id ${NEAR_DEV_ACCOUNT} call $(cat neardev/dev-account) nft_transfer '{ "token_id": "0", "receiver_id": "dev-1630186207494-62680183246154"}' --amount 0.000000000000000000000001
+#	near --account_id $(cat neardev/dev-account) call $(cat neardev/dev-account) nft_transfer '{ "token_id": "0", "receiver_id": "ilyar.testnet"}' --amount 0.000000000000000000000001
