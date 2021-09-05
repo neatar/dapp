@@ -8,7 +8,7 @@ const HALF_SVG: i32 = 32;
 pub const FOREGROUND_COLOR: [u8; 4] = [238, 238, 238, 255];
 
 pub fn make(into_id: &[u8]) -> String {
-    svg_from_vec(&into_id, HALF_SVG)
+    svg_from_vec(into_id, HALF_SVG)
         .to_string()
         .replace("\n", "")
 }
@@ -186,7 +186,7 @@ pub fn svg_from_vec(into_id: &[u8], halfsize: i32) -> Document {
         "viewBox",
         (-halfsize, -halfsize, 2 * halfsize, 2 * halfsize),
     );
-    let colors = get_colors_from_vec(&into_id);
+    let colors = get_colors_from_vec(into_id);
     let data = calculate_svg_data(halfsize, colors);
     for x in data.into_iter() {
         document = document.add(x);
@@ -226,7 +226,7 @@ pub fn get_colors_from_vec(into_id: &[u8]) -> Vec<[u8; 4]> {
     let into_zero = [0u8; 32].to_vec();
     let zero = blake2b(64, &[], &into_zero).as_bytes().to_vec();
 
-    let id_prep = blake2b(64, &[], &into_id).as_bytes().to_vec();
+    let id_prep = blake2b(64, &[], into_id).as_bytes().to_vec();
 
     let mut id: Vec<u8> = Vec::new();
     for (i, x) in id_prep.iter().enumerate() {
