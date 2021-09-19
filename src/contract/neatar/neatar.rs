@@ -3,7 +3,8 @@ use cid::Cid;
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };
-use near_contract_standards::non_fungible_token::{hash_account_id, NonFungibleToken};
+use near_contract_standards::non_fungible_token::hash_account_id;
+use near_contract_standards::non_fungible_token::NonFungibleToken;
 use near_contract_standards::non_fungible_token::{Token, TokenId};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
@@ -16,6 +17,37 @@ use near_sdk::{
 };
 
 mod identicon;
+
+fn new_token(svg: String, owner_id: Option<AccountId>) -> Token {
+    let hash = Code::Sha2_256.digest(svg.as_bytes());
+    let token_id = Cid::new_v1(RAW, hash).to_string();
+    let owner_id = owner_id.unwrap_or(env::current_account_id());
+    Token {
+        token_id,
+        owner_id,
+        metadata: Some(new_token_metadata(svg)),
+        approved_account_ids: None,
+    }
+}
+
+fn new_token_metadata(svg: String) -> TokenMetadata {
+    let media = format!("svg+xml;base64,{}", base64::encode(svg.clone()));
+    let media_hash = Base64VecU8(env::sha256(svg.as_bytes()));
+    TokenMetadata {
+        title: None,
+        description: None,
+        media: Some(media.clone()),
+        media_hash: Some(media_hash),
+        copies: Some(1),
+        issued_at: Some(env::block_timestamp().to_string()),
+        expires_at: None,
+        starts_at: None,
+        updated_at: None,
+        extra: None,
+        reference: None,
+        reference_hash: None,
+    }
+}
 
 // Prepaid gas for making a single simple call.
 const SINGLE_CALL_GAS: Gas = Gas(200000000000000);
@@ -69,19 +101,17 @@ impl Contract {
         }
     }
 
-    pub fn avatar_of(self, account_id: AccountId) -> String {
+    fn current_token(&self, account_id: AccountId) -> Token {
         let list = self.token.nft_tokens_for_owner(account_id, None, None);
         if list.is_empty() {
-            return DEFAULT_AVATAR.to_string();
+            return new_token(DEFAULT_AVATAR.to_string(), None);
         }
-        let media = list
-            .last()
-            .cloned()
-            .unwrap()
-            .metadata
-            .unwrap()
-            .media
-            .unwrap();
+        list.last().cloned().unwrap()
+    }
+
+    pub fn avatar_of(&self, account_id: AccountId) -> String {
+        let token = self.current_token(account_id);
+        let media = token.metadata.unwrap().media.unwrap();
         format!("data:image/{}", media)
     }
 
@@ -95,31 +125,15 @@ impl Contract {
     pub fn avatar_create_for(&mut self, owner_id: AccountId) -> String {
         let hash: &[u8] = &hash_account_id(&owner_id);
         let svg = identicon::make(hash);
-        let media = format!("svg+xml;base64,{}", base64::encode(svg.clone()));
-        let hash = Code::Sha2_256.digest(svg.as_bytes());
-        let media_hash = Base64VecU8(env::sha256(svg.as_bytes()));
-        let token_id = Cid::new_v1(RAW, hash).to_string();
-        let escrow_id = env::current_account_id();
-        self.token.mint(
-            token_id.clone(),
-            escrow_id,
-            Some(TokenMetadata {
-                title: None,
-                description: None,
-                media: Some(media.clone()),
-                media_hash: Some(media_hash),
-                copies: Some(1),
-                issued_at: Some(env::block_timestamp().to_string()),
-                expires_at: None,
-                starts_at: None,
-                updated_at: None,
-                extra: None,
-                reference: None,
-                reference_hash: None,
-            }),
-        );
+        let contract_id = env::current_account_id();
+        let token = new_token(svg, None);
+        let token_id = token.token_id;
+        let metadata = token.metadata.unwrap();
+        let media = metadata.media.clone().unwrap_or_default();
+        self.token
+            .mint(token_id.clone(), contract_id.clone(), Some(metadata));
         env::promise_create(
-            env::current_account_id(),
+            contract_id,
             "nft_transfer",
             json!({
                 "token_id": token_id,
