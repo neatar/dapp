@@ -1,11 +1,11 @@
 body {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
 }
 
 .panel {
-    text-align: center;
-    display: block;
+  text-align: center;
+  display: block;
 }
 
 .panel_signed {
@@ -13,8 +13,8 @@ body {
 }
 
 .panel__title {
-    font-size: 2rem;
-    font-weight: bold;
+  font-size: 2rem;
+  font-weight: bold;
 }
 
 .panel__account {
@@ -23,5 +23,9 @@ body {
 }
 
 .panel__description {
-    font-size: 1.5rem;
+  font-size: 1.5rem;
+}
+
+.avatar {
+  width: 50%;
 }

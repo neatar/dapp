@@ -1,36 +1,38 @@
 import 'regenerator-runtime/runtime'
 import { initContract, login, logout, isSignedIn, accountId } from './wallet'
 
-let avatar
+function behavior(name, fn) {
+  document.querySelectorAll(`[data-behavior=${name}]`).forEach(fn)
+}
+const onclick = (fn) => (elem) => {
+  elem.onclick = fn
+}
+const show = () => (elem) => {
+  elem.style = 'block'
+}
+const innerText = (text) => (elem) => {
+  elem.innerText = text
+}
 
-document.querySelectorAll('[data-behavior=login]').forEach(elem => {
-  elem.onclick = login
-})
-document.querySelectorAll('[data-behavior=logout]').forEach(elem => {
+behavior('login', onclick(login))
+behavior('logout', onclick(logout))
+behavior('logout', elem => {
   elem.onclick = logout
 })
 
 function signedInFlow() {
-  document.querySelectorAll('[data-behavior=signed-in-flow]').forEach(elem => {
-    elem.style = 'block'
-  })
+  behavior('signed-in-flow', show())
 }
 
 function signedOutFlow() {
-  document.querySelectorAll('[data-behavior=signed-out-flow]').forEach(elem => {
-    elem.style = 'block'
-  })
-  document.querySelectorAll('[data-behavior=account-id]').forEach(elem => {
-    elem.innerText = accountId()
-  })
+  behavior('signed-out-flow', show())
+  behavior('account-id', innerText(accountId()))
   return fetchAvatar()
 }
 
 async function fetchAvatar() {
-  console.log(isSignedIn())
-  console.log(accountId())
-  avatar = await contract.avatar_of(accountId())
-  document.querySelectorAll('[data-behavior=avatar]').forEach(elem => {
+  const avatar = await contract.avatar_of(accountId())
+  behavior('avatar',elem => {
     elem.src = avatar
   })
 }
