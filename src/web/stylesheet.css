@@ -29,3 +29,7 @@ body {
 .avatar {
   width: 50%;
 }
+
+[data-behavior^=action] {
+  text-transform: uppercase;
+}

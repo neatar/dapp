@@ -51,16 +51,17 @@ check:
 build-contract:
 	bash src/contract/build.sh
 rebuild-contract: clean-build-contract build-contract
-redeploy: deploy-delete deploy-new call_avatar_create_for_beta_tester
-
-deploy: rebuild
-	near dev-deploy
-deploy-new: deploy
-	near --account_id ${CONTRACT_NAME} call ${CONTRACT_NAME} new
-deploy-delete: neardev
+redeploy-contract: deploy-delete-contract deploy-contract-init
+deploy-contract: rebuild-contract
+	near dev-deploy build/contract/neatar.wasm
+deploy-contract-init: deploy-contract
+	# near --account_id ${CONTRACT_NAME} call ${CONTRACT_NAME} init
+	near --account_id $(shell cat neardev/dev-account) call $(shell cat neardev/dev-account) init
+deploy-delete-contract: neardev
 	near delete ${CONTRACT_NAME} ${NEAR_DEV_ACCOUNT}
 	rm -fr neardev
-
+migrate-contract: deploy-contract
+	near --account_id ${CONTRACT_NAME} call ${CONTRACT_NAME} migrate
 nft_metadata:
 	near view ${CONTRACT_NAME} nft_metadata
 nft_tokens:
@@ -73,7 +74,7 @@ view_avatar_of_tb:
 	near view ${CONTRACT_NAME} avatar_of '{"account_id": "tb.testnet"}'
 call_avatar_create: call_avatar_create_me call_avatar_create_for_beta_tester
 call_avatar_create_me:
-	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT_NAME} avatar_create --amount 1
+	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT_NAME} avatar_create --depositYocto 26370000000000000000000
 # 0.02401721 - 0.0016 = 0.02241721
 call_avatar_create_for_beta_tester: call_avatar_create_me
 	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT_NAME} avatar_create_for '{"owner_id":"tb.testnet"}' --amount 1

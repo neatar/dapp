@@ -14,7 +14,6 @@
     "build-asset": "pwa-asset-generator src/web/asset/logo.svg src/web/asset/icon --favicon --favicon --type png --padding 0 --background transparent --opaque false --log false",
     "build-web": "parcel build src/web/index.html --public-url ./ --out-dir build/web",
     "deploy-web": "yarn --silent build-web && gh-pages --repo git@github.com:neatar/neatar.github.io.git --dist build/web",
-    "watch": "nodemon --watch src -e ts --exec 'npm run start'",
     "start": "parcel src/web/index.html --open"
   },
   "devDependencies": {
@@ -22,7 +21,6 @@
     "env-cmd": "^10.1.0",
     "gh-pages": "^3.2.3",
     "near-api-js": "^0.42.0",
-    "nodemon": "^2.0.12",
     "parcel-bundler": "^1.12.5",
     "pwa-asset-generator": "^4.3.6",
     "ts-node": "^10.2.1",

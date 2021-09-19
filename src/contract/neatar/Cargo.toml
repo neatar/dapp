@@ -1,5 +1,6 @@
 [package]
 name = "neatar"
+description = "The Web3 avatar"
 version = "1.0.0-alpha.0"
 edition = "2018"
 license = "UNLICENSED"
@@ -15,6 +16,7 @@ bench = false
 doc = false
 
 [dependencies]
+lazy-static-include = "3.1.1"
 near-sdk = "4.0.0-pre.2"
 near-contract-standards = "4.0.0-pre.2"
 cid = "0.7.0"

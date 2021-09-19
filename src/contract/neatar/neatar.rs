@@ -1,14 +1,16 @@
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use near_contract_standards::non_fungible_token::hash_account_id;
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };
-use near_contract_standards::non_fungible_token::hash_account_id;
 use near_contract_standards::non_fungible_token::NonFungibleToken;
 use near_contract_standards::non_fungible_token::{Token, TokenId};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::Base64VecU8;
+use near_sdk::log;
+use near_sdk::require;
 use near_sdk::serde_json::json;
 use near_sdk::Balance;
 use near_sdk::Gas;
@@ -18,10 +20,18 @@ use near_sdk::{
 
 mod identicon;
 
+fn pack_data_image(data: String, media_type: Option<String>) -> String {
+    format!(
+        "{};base64,{}",
+        media_type.unwrap_or_else(|| "svg+xml".to_string()),
+        base64::encode(data)
+    )
+}
+
 fn new_token(svg: String, owner_id: Option<AccountId>) -> Token {
     let hash = Code::Sha2_256.digest(svg.as_bytes());
     let token_id = Cid::new_v1(RAW, hash).to_string();
-    let owner_id = owner_id.unwrap_or(env::current_account_id());
+    let owner_id = owner_id.unwrap_or_else(env::current_account_id);
     Token {
         token_id,
         owner_id,
@@ -31,12 +41,12 @@ fn new_token(svg: String, owner_id: Option<AccountId>) -> Token {
 }
 
 fn new_token_metadata(svg: String) -> TokenMetadata {
-    let media = format!("svg+xml;base64,{}", base64::encode(svg.clone()));
+    let media = pack_data_image(svg.clone(), None);
     let media_hash = Base64VecU8(env::sha256(svg.as_bytes()));
     TokenMetadata {
         title: None,
         description: None,
-        media: Some(media.clone()),
+        media: Some(media),
         media_hash: Some(media_hash),
         copies: Some(1),
         issued_at: Some(env::block_timestamp().to_string()),
@@ -55,13 +65,15 @@ const ONE_YOCTO: Balance = 1;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-pub struct Contract {
+pub struct Neatar {
     token: NonFungibleToken,
     metadata: LazyOption<NFTContractMetadata>,
 }
 
 const RAW: u64 = 0x55;
-const DEFAULT_AVATAR: &str = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 288 288'%3E%3Cg id='l' data-name='l'%3E%3Cpath d='M187.58,79.81l-30.1,44.69a3.2,3.2,0,0,0,4.75,4.2L191.86,103a1.2,1.2,0,0,1,2,.91v80.46a1.2,1.2,0,0,1-2.12.77L102.18,77.93A15.35,15.35,0,0,0,90.47,72.5H87.34A15.34,15.34,0,0,0,72,87.84V201.16A15.34,15.34,0,0,0,87.34,216.5h0a15.35,15.35,0,0,0,13.08-7.31l30.1-44.69a3.2,3.2,0,0,0-4.75-4.2L96.14,186a1.2,1.2,0,0,1-2-.91V104.61a1.2,1.2,0,0,1,2.12-.77l89.55,107.23a15.35,15.35,0,0,0,11.71,5.43h3.13A15.34,15.34,0,0,0,216,201.16V87.84A15.34,15.34,0,0,0,200.66,72.5h0A15.35,15.35,0,0,0,187.58,79.81Z'/%3E%3C/g%3E%3C/svg%3E";
+lazy_static_include::lazy_static_include_str! {
+    LOGO => "../../web/asset/logo.svg",
+}
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
@@ -73,15 +85,20 @@ enum StorageKey {
 }
 
 #[near_bindgen]
-impl Contract {
+impl Neatar {
+    #[private]
     #[init]
-    pub fn new() -> Self {
+    pub fn init() -> Self {
         assert!(!env::state_exists(), "Already initialized");
+        Self::new()
+    }
+
+    fn new() -> Self {
         let owner_id = env::current_account_id();
         Self {
             token: NonFungibleToken::new(
                 StorageKey::NonFungibleToken,
-                owner_id.clone(),
+                owner_id,
                 Some(StorageKey::TokenMetadata),
                 Some(StorageKey::Enumeration),
                 Some(StorageKey::Approval),
@@ -90,9 +107,12 @@ impl Contract {
                 StorageKey::Metadata,
                 Some(&NFTContractMetadata {
                     spec: NFT_METADATA_SPEC.to_string(),
-                    name: "Avatar for Web3".to_string(),
-                    symbol: "AVATAR".to_string(),
-                    icon: Some(identicon::make(owner_id.as_bytes())),
+                    name: "The Web3 avatar".to_string(),
+                    symbol: "NEATAR".to_string(),
+                    icon: Some(format!(
+                        "data:image/{}",
+                        pack_data_image(LOGO.to_string(), None)
+                    )),
                     base_uri: Some("data:image".to_string()),
                     reference: None,
                     reference_hash: None,
@@ -101,12 +121,60 @@ impl Contract {
         }
     }
 
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        let current: Neatar = env::state_read().expect("State doesn't exist");
+        let mut next = Neatar::new();
+        next.token = current.token;
+        next.metadata = current.metadata;
+        next
+    }
+
     fn current_token(&self, account_id: AccountId) -> Token {
         let list = self.token.nft_tokens_for_owner(account_id, None, None);
         if list.is_empty() {
-            return new_token(DEFAULT_AVATAR.to_string(), None);
+            return new_token(LOGO.to_string(), None);
         }
         list.last().cloned().unwrap()
+    }
+
+    pub fn ft_burn(&mut self, token_id: TokenId) {
+        let initial_storage_usage = env::storage_usage();
+        let owner_id = self
+            .token
+            .owner_by_id
+            .get(&token_id)
+            .expect("Not found token");
+        require!(owner_id == env::predecessor_account_id(), "Only owner");
+        // make burn token
+        match self
+            .token
+            .tokens_per_owner
+            .as_mut()
+            .and_then(|per_owner| per_owner.remove(&owner_id))
+        {
+            None => {}
+            Some(mut set) => set.clear(),
+        };
+        self.token
+            .approvals_by_id
+            .as_mut()
+            .and_then(|by_id| by_id.remove(&token_id));
+        self.token
+            .token_metadata_by_id
+            .as_mut()
+            .and_then(|by_id| by_id.remove(&token_id));
+        self.token.owner_by_id.remove(&token_id);
+        // make refund for storage free
+        let storage_free = initial_storage_usage
+            .checked_sub(env::storage_usage())
+            .unwrap_or_default();
+        log!("storage free: {}", storage_free);
+        let refund = env::storage_byte_cost() * Balance::from(storage_free);
+        if refund > 1 {
+            Promise::new(env::predecessor_account_id()).transfer(refund);
+        }
     }
 
     pub fn avatar_of(&self, account_id: AccountId) -> String {
@@ -121,8 +189,19 @@ impl Contract {
         self.avatar_create_for(owner_id)
     }
 
+    pub fn avatar_burn(&mut self) {
+        self.ft_burn(self.current_token(env::predecessor_account_id()).token_id)
+    }
+
+    #[private]
+    pub fn avatar_burn_for(&mut self, owner_id: AccountId) {
+        // TODO
+    }
+
     #[payable]
+    #[private]
     pub fn avatar_create_for(&mut self, owner_id: AccountId) -> String {
+        let initial_storage_usage = env::storage_usage();
         let hash: &[u8] = &hash_account_id(&owner_id);
         let svg = identicon::make(hash);
         let contract_id = env::current_account_id();
@@ -130,6 +209,7 @@ impl Contract {
         let token_id = token.token_id;
         let metadata = token.metadata.unwrap();
         let media = metadata.media.clone().unwrap_or_default();
+        self.token.owner_id = env::predecessor_account_id(); // FIXME
         self.token
             .mint(token_id.clone(), contract_id.clone(), Some(metadata));
         env::promise_create(
@@ -144,16 +224,20 @@ impl Contract {
             ONE_YOCTO,
             SINGLE_CALL_GAS,
         );
+        let storage_usage = env::storage_usage()
+            .checked_sub(initial_storage_usage)
+            .unwrap_or_default();
+        log!("storage usage: {}", storage_usage);
         media
     }
 }
 
-near_contract_standards::impl_non_fungible_token_core!(Contract, token);
-near_contract_standards::impl_non_fungible_token_approval!(Contract, token);
-near_contract_standards::impl_non_fungible_token_enumeration!(Contract, token);
+near_contract_standards::impl_non_fungible_token_core!(Neatar, token);
+near_contract_standards::impl_non_fungible_token_approval!(Neatar, token);
+near_contract_standards::impl_non_fungible_token_enumeration!(Neatar, token);
 
 #[near_bindgen]
-impl NonFungibleTokenMetadataProvider for Contract {
+impl NonFungibleTokenMetadataProvider for Neatar {
     fn nft_metadata(&self) -> NFTContractMetadata {
         self.metadata.get().unwrap()
     }
@@ -183,7 +267,7 @@ mod unit {
     fn test_new() {
         let mut context = get_context(accounts(1));
         testing_env!(context.build());
-        let contract = Contract::new();
+        let contract = Neatar::new();
         testing_env!(context.is_view(true).build());
         assert_eq!(contract.nft_token("1".to_string()), None);
     }
@@ -193,14 +277,14 @@ mod unit {
     fn test_default() {
         let context = get_context(accounts(1));
         testing_env!(context.build());
-        let _contract = Contract::default();
+        let _contract = Neatar::default();
     }
 
     #[test]
     fn test_avatar_create() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Neatar::new();
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -220,10 +304,29 @@ mod unit {
     }
 
     #[test]
+    fn test_avatar_burn() {
+        let mut context = get_context(accounts(0));
+        testing_env!(context.build());
+        let mut contract = Neatar::new();
+
+        testing_env!(context
+            .storage_usage(env::storage_usage())
+            .attached_deposit(MINT_STORAGE_COST)
+            .predecessor_account_id(accounts(0))
+            .signer_account_id(accounts(0))
+            .build());
+
+        assert_eq!(AVATAR, contract.avatar_create());
+        assert_eq!(1722, contract.avatar_of(accounts(0)).len());
+        contract.avatar_burn();
+        assert_eq!(614, contract.avatar_of(accounts(0)).len());
+    }
+
+    #[test]
     fn test_transfer() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Neatar::new();
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -259,7 +362,7 @@ mod unit {
     fn test_approve() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Neatar::new();
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -289,7 +392,7 @@ mod unit {
     fn test_revoke() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Neatar::new();
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -326,7 +429,7 @@ mod unit {
     fn test_revoke_all() {
         let mut context = get_context(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Neatar::new();
 
         testing_env!(context
             .storage_usage(env::storage_usage())

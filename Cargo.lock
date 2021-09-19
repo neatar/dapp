@@ -1959,6 +1959,7 @@ dependencies = [
  "blake2-rfc",
  "cid",
  "hex",
+ "lazy-static-include",
  "near-contract-standards",
  "near-sdk",
  "near-sdk-sim",

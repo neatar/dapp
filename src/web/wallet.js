@@ -20,6 +20,13 @@ export async function initContract() {
   window.contract = new Neatar(window.walletConnection.account(), nearConfig.contractName)
 }
 
+/**
+ * @returns {Neatar}
+ */
+export function contract() {
+  return window.contract
+}
+
 export function logout() {
   window.walletConnection.signOut()
   window.location.replace(window.location.origin + window.location.pathname) // reload page
