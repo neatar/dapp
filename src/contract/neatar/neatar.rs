@@ -1,6 +1,3 @@
-use std::convert::TryFrom;
-use std::convert::TryInto;
-
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use near_contract_standards::non_fungible_token::metadata::{
@@ -10,7 +7,7 @@ use near_contract_standards::non_fungible_token::{hash_account_id, NonFungibleTo
 use near_contract_standards::non_fungible_token::{Token, TokenId};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
-use near_sdk::json_types::{Base64VecU8, ValidAccountId};
+use near_sdk::json_types::Base64VecU8;
 use near_sdk::serde_json::json;
 use near_sdk::Balance;
 use near_sdk::Gas;
@@ -21,7 +18,7 @@ use near_sdk::{
 mod identicon;
 
 // Prepaid gas for making a single simple call.
-const SINGLE_CALL_GAS: Gas = 200000000000000;
+const SINGLE_CALL_GAS: Gas = Gas(200000000000000);
 const ONE_YOCTO: Balance = 1;
 
 #[near_bindgen]
@@ -48,12 +45,11 @@ impl Contract {
     #[init]
     pub fn new() -> Self {
         assert!(!env::state_exists(), "Already initialized");
-        let contract_id = env::current_account_id();
-        let owner_id = ValidAccountId::try_from(contract_id.clone()).unwrap();
+        let owner_id = env::current_account_id();
         Self {
             token: NonFungibleToken::new(
                 StorageKey::NonFungibleToken,
-                owner_id,
+                owner_id.clone(),
                 Some(StorageKey::TokenMetadata),
                 Some(StorageKey::Enumeration),
                 Some(StorageKey::Approval),
@@ -64,7 +60,7 @@ impl Contract {
                     spec: NFT_METADATA_SPEC.to_string(),
                     name: "Avatar for Web3".to_string(),
                     symbol: "AVATAR".to_string(),
-                    icon: Some(identicon::make(contract_id.as_bytes())),
+                    icon: Some(identicon::make(owner_id.as_bytes())),
                     base_uri: Some("data:image".to_string()),
                     reference: None,
                     reference_hash: None,
@@ -73,7 +69,7 @@ impl Contract {
         }
     }
 
-    pub fn avatar_of(self, account_id: ValidAccountId) -> String {
+    pub fn avatar_of(self, account_id: AccountId) -> String {
         let list = self.token.nft_tokens_for_owner(account_id, None, None);
         if list.is_empty() {
             return DEFAULT_AVATAR.to_string();
@@ -91,20 +87,19 @@ impl Contract {
 
     #[payable]
     pub fn avatar_create(&mut self) -> String {
-        let owner_id = env::signer_account_id().try_into().unwrap();
+        let owner_id = env::signer_account_id();
         self.avatar_create_for(owner_id)
     }
 
     #[payable]
-    pub fn avatar_create_for(&mut self, owner_id: ValidAccountId) -> String {
-        let svg = identicon::make(&hash_account_id(&owner_id.clone().into()));
+    pub fn avatar_create_for(&mut self, owner_id: AccountId) -> String {
+        let hash: &[u8] = &hash_account_id(&owner_id);
+        let svg = identicon::make(hash);
         let media = format!("svg+xml;base64,{}", base64::encode(svg.clone()));
         let hash = Code::Sha2_256.digest(svg.as_bytes());
         let media_hash = Base64VecU8(env::sha256(svg.as_bytes()));
         let token_id = Cid::new_v1(RAW, hash).to_string();
-        self.token.owner_id = env::signer_account_id(); // FIXME
-        let current_account_id = env::current_account_id();
-        let escrow_id = ValidAccountId::try_from(current_account_id).unwrap();
+        let escrow_id = env::current_account_id();
         self.token.mint(
             token_id.clone(),
             escrow_id,
@@ -125,7 +120,7 @@ impl Contract {
         );
         env::promise_create(
             env::current_account_id(),
-            b"nft_transfer",
+            "nft_transfer",
             json!({
                 "token_id": token_id,
                 "receiver_id": owner_id,
@@ -152,18 +147,16 @@ impl NonFungibleTokenMetadataProvider for Contract {
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod unit {
+    use super::*;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::testing_env;
-    use near_sdk::MockedBlockchain;
-
-    use super::*;
 
     const MINT_STORAGE_COST: u128 = 25900000000000000000000;
     // 0.0259
     const TOKEN_ID: &str = "bafkreib5ry3rranl7tqov2uilfxbg4chuy6w2px3shlbchysqbubnu2vqu";
     const AVATAR: &str = "svg+xml;base64,PHN2ZyB2aWV3Qm94PSItMzIgLTMyIDY0IDY0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjAiIGN5PSIwIiBmaWxsPSIjZWVlZWVlIiByPSIzMiIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMCIgY3k9Ii0yNCIgZmlsbD0iIzIxNTRlZCIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMCIgY3k9Ii0xMiIgZmlsbD0iI2JmODlmNSIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iLTEwIiBjeT0iLTE4IiBmaWxsPSIjYTUwZDFkIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSItMjAiIGN5PSItMTIiIGZpbGw9IiM4N2VkMjEiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9Ii0xMCIgY3k9Ii02IiBmaWxsPSIjMGRhNTMzIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSItMjAiIGN5PSIwIiBmaWxsPSIjYTUwZDFkIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSItMjAiIGN5PSIxMiIgZmlsbD0iIzIxNTRlZCIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iLTEwIiBjeT0iNiIgZmlsbD0iI2JmODlmNSIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iLTEwIiBjeT0iMTgiIGZpbGw9IiM4OWY1ZjUiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjAiIGN5PSIyNCIgZmlsbD0iIzA2NDcwZiIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMCIgY3k9IjEyIiBmaWxsPSIjNDcyYTA2IiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIxMCIgY3k9IjE4IiBmaWxsPSIjMjY0NzA2IiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjEyIiBmaWxsPSIjMjUyMWVkIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIxMCIgY3k9IjYiIGZpbGw9IiM0NzA2MWYiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iMCIgZmlsbD0iIzI2NDcwNiIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSItMTIiIGZpbGw9IiMwNjQ3MGYiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iLTYiIGZpbGw9IiM0NzJhMDYiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iLTE4IiBmaWxsPSIjODlmNWY1IiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIwIiBjeT0iMCIgZmlsbD0iIzA2NDcyZSIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PC9zdmc+";
 
-    fn get_context(predecessor_account_id: ValidAccountId) -> VMContextBuilder {
+    fn get_context(predecessor_account_id: AccountId) -> VMContextBuilder {
         let mut builder = VMContextBuilder::new();
         builder
             .current_account_id(accounts(0))
@@ -206,7 +199,7 @@ mod unit {
         assert_eq!(avatar, AVATAR);
 
         let token = contract.nft_token(TOKEN_ID.to_string()).unwrap();
-        assert_eq!(token.owner_id, accounts(0).to_string());
+        assert_eq!(token.owner_id, accounts(0));
         let avatar = token.metadata.unwrap().media.unwrap();
         assert_eq!(avatar, AVATAR);
         assert_eq!(token.approved_account_ids.unwrap().len(), 0);
@@ -240,7 +233,7 @@ mod unit {
             .build());
         if let Some(token) = contract.nft_token(TOKEN_ID.to_string()) {
             assert_eq!(token.token_id, TOKEN_ID.to_string());
-            assert_eq!(token.owner_id, accounts(1).to_string());
+            assert_eq!(token.owner_id, accounts(1));
             assert_eq!(token.metadata.unwrap().media.unwrap().len(), 1711);
             assert_eq!(token.approved_account_ids.unwrap(), HashMap::new());
         } else {

@@ -1,6 +1,14 @@
-clean-out:
-	rm -fr out
-clean: clean-out
+SHELL=bash
+-include neardev/dev-account.env
+-include .env
+
+in-docker-%:
+	bash .docker/builder/builder.sh make $*
+
+clean-build-contract:
+	rm -fr build/contract
+
+clean: clean-build-contract
 	cargo clean
 
 lint:
@@ -16,7 +24,7 @@ audit-fix:
 audit:
 	cargo audit
 
-test-contract-integration: out/main.wasm
+test-contract-integration: build/contract
 # TODO add integration test
 
 test-contract-unit:
@@ -36,57 +44,40 @@ test
 fix:\
 audit-fix\
 fmt
-rustup:
-	rustup component add clippy
-	rustup component add rustfmt
-	rustup component add rust-src
-	rustup target add wasm32-unknown-unknown
-	cargo install cargo-audit --features=fix
 
 check:
 	cargo check
 
-out/main.wasm:
-	cargo build --target wasm32-unknown-unknown --release
-	@mkdir -p out
-	@cp target/wasm32-unknown-unknown/release/avatar.wasm out/main.wasm
-	@du -b out/main.wasm
-	@sha256sum out/main.wasm
-
-build:\
-out/main.wasm
-rebuild: clean-out build
+build-contract:
+	bash src/contract/build.sh
+rebuild-contract: clean-build-contract build-contract
 redeploy: deploy-delete deploy-new call_avatar_create_for_beta_tester
 
 deploy: rebuild
 	near dev-deploy
-#CONTRACT=$(cat neardev/dev-account)
-CONTRACT=$(shell cat neardev/dev-account)
 deploy-new: deploy
-	near --account_id ${CONTRACT} call ${CONTRACT} new
+	near --account_id ${CONTRACT_NAME} call ${CONTRACT_NAME} new
 deploy-delete: neardev
-	near delete ${CONTRACT} ${NEAR_DEV_ACCOUNT}
+	near delete ${CONTRACT_NAME} ${NEAR_DEV_ACCOUNT}
 	rm -fr neardev
 
 nft_metadata:
-	near view ${CONTRACT} nft_metadata
+	near view ${CONTRACT_NAME} nft_metadata
 nft_tokens:
-	near view ${CONTRACT} nft_tokens
+	near view ${CONTRACT_NAME} nft_tokens
 nft_tokens_for_owner:
-	near view ${CONTRACT} nft_tokens_for_owner '{"account_id": "ilyar.testnet", "from_index": "0", "limit": 50}'
+	near view ${CONTRACT_NAME} nft_tokens_for_owner '{"account_id": "ilyar.testnet", "from_index": "0", "limit": 50}'
 view_avatar_of_me:
-	near view ${CONTRACT} avatar_of '{"account_id": "ilyar.testnet"}'
+	near view ${CONTRACT_NAME} avatar_of '{"account_id": "ilyar.testnet"}'
 view_avatar_of_tb:
-	near view ${CONTRACT} avatar_of '{"account_id": "tb.testnet"}'
+	near view ${CONTRACT_NAME} avatar_of '{"account_id": "tb.testnet"}'
 call_avatar_create: call_avatar_create_me call_avatar_create_for_beta_tester
 call_avatar_create_me:
-	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT} avatar_create --amount 1
+	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT_NAME} avatar_create --amount 1
 # 0.02401721 - 0.0016 = 0.02241721
 call_avatar_create_for_beta_tester: call_avatar_create_me
-	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT} avatar_create_for '{"owner_id":"tb.testnet"}' --amount 1
-	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT} avatar_create_for '{"owner_id":"jondou42.testnet"}' --amount 1
-	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT} avatar_create_for '{"owner_id":"anftimatter.testnet"}' --amount 1
-demo:
-	cd demo && yarn dev:build:web && cd dist && git add . && git commit --amend -m init && git pub -f
+	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT_NAME} avatar_create_for '{"owner_id":"tb.testnet"}' --amount 1
+	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT_NAME} avatar_create_for '{"owner_id":"jondou42.testnet"}' --amount 1
+	near --account_id ${NEAR_DEV_ACCOUNT} call ${CONTRACT_NAME} avatar_create_for '{"owner_id":"anftimatter.testnet"}' --amount 1
 #	near --account_id ${NEAR_DEV_ACCOUNT} call $(cat neardev/dev-account) nft_transfer '{ "token_id": "bafkreieyck4x2tujwtvmdu4dltjmff67khqviaewzixidj5zoa2sjrc62y", "receiver_id": "dev-1630244685532-93937831175122"}' --amount 0.000000000000000000000001
 #	near --account_id $(cat neardev/dev-account) call $(cat neardev/dev-account) nft_transfer '{ "token_id": "bafkreieyck4x2tujwtvmdu4dltjmff67khqviaewzixidj5zoa2sjrc62y", "receiver_id": "ilyar.testnet"}' --amount 0.000000000000000000000001

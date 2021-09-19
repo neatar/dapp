@@ -1,0 +1,31 @@
+{
+  "name": "neatar",
+  "description": "The Web3 avatar like as Gravatar",
+  "version": "1.0.0-alpha.0",
+  "repository": "https://github.com/neatar/dapp",
+  "license": "UNLICENSED",
+  "browserslist": [
+    "defaults",
+    "Firefox ESR",
+    "not IE 11"
+  ],
+  "scripts": {
+    "postinstall": "yarn --silent build-asset",
+    "build-asset": "pwa-asset-generator src/web/asset/logo.svg src/web/asset/icon --favicon --favicon --type png --padding 0 --background transparent --opaque false --log false",
+    "build-web": "parcel build src/web/index.html --public-url ./ --out-dir build/web",
+    "deploy-web": "yarn --silent build-web && gh-pages --repo git@github.com:neatar/neatar.github.io.git --dist build/web",
+    "watch": "nodemon --watch src -e ts --exec 'npm run start'",
+    "start": "parcel src/web/index.html --open"
+  },
+  "devDependencies": {
+    "@4ire-labs/near-sdk": "1.0.0-beta.8",
+    "env-cmd": "^10.1.0",
+    "gh-pages": "^3.2.3",
+    "near-api-js": "^0.42.0",
+    "nodemon": "^2.0.12",
+    "parcel-bundler": "^1.12.5",
+    "pwa-asset-generator": "^4.3.6",
+    "ts-node": "^10.2.1",
+    "typescript": "<4.4.0"
+  }
+}

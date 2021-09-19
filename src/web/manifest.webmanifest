@@ -1,0 +1,24 @@
+{
+  "short_name": "NEATAR",
+  "name": "NEATAR — The Web3 avatar like as Gravatar",
+  "description": "The Web3 avatar like as Gravatar",
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "./",
+  "start_url": "./",
+  "icons": [
+    {
+      "src": "asset/icon/manifest-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "asset/icon/manifest-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ]
+}

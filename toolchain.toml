@@ -1,0 +1,11 @@
+[toolchain]
+channel = "stable-2021-07-29"
+components = [
+    "rust-src",
+    "clippy",
+    "rustfmt",
+]
+targets = [
+    "wasm32-unknown-unknown",
+]
+profile = "minimal"

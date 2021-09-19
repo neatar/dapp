@@ -1,0 +1,27 @@
+body {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+}
+
+.panel {
+    text-align: center;
+    display: block;
+}
+
+.panel_signed {
+  padding-top: 20px;
+}
+
+.panel__title {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.panel__account {
+  font-size: 1.5rem;
+  line-height: 2.8rem;
+}
+
+.panel__description {
+    font-size: 1.5rem;
+}

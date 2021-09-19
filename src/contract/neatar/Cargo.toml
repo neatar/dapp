@@ -1,0 +1,31 @@
+[package]
+name = "neatar"
+version = "1.0.0-alpha.0"
+edition = "2018"
+license = "UNLICENSED"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "neatar.rs"
+test = true
+doctest = false
+bench = false
+doc = false
+
+[dependencies]
+near-sdk = "4.0.0-pre.2"
+near-contract-standards = "4.0.0-pre.2"
+cid = "0.7.0"
+hex = "0.4.3"
+png = "0.16.8"
+blake2-rfc = "0.2.18"
+palette = "0.6.0"
+base58 = "0.1.0"
+svg = "0.10.0"
+anyhow = "1.0.42"
+base64 = "0.13.0"
+
+[dev-dependencies]
+near-sdk-sim = "4.0.0-pre.2"

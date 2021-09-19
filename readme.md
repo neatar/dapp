@@ -1,7 +1,7 @@
 <div align="center">
-  <h1><code>near-rust-intro</code></h1>
+  <h1><code>neatar</code></h1>
   <p>
-    <strong><a href="https://docs.near.org/docs/tutorials/contracts/intro-to-rust">An Introduction to Rust Smart Contracts</strong>
+    <strong>The Web3 avavar</strong>
   </p>
 </div>
 
@@ -12,23 +12,6 @@ make fix
 make qa
 make build
 make clean
-```
-
-### Run CI local
-
-Installation [act](https://github.com/nektos/act):
-```shell
-brew install act
-```
-
-Setup env vars:
-```shell
-echo "GITHUB_TOKEN=%GITHUB_TOKEN%" | tee .secrets
-```
-
-Run
-```shell
-act --help
 ```
 
 ## Deploy test
