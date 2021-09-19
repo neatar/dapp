@@ -24,14 +24,13 @@ audit-fix:
 audit:
 	cargo audit
 
-test-contract-integration: build/contract
+test-contract-integration: build-contract
 # TODO add integration test
 
 test-contract-unit:
 	cargo test --lib
 
 test-contract:\
-test-contract-integration \
 test-contract-unit
 
 test:\
