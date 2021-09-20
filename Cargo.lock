@@ -1960,6 +1960,7 @@ dependencies = [
  "cid",
  "hex",
  "lazy-static-include",
+ "lazy_static",
  "near-contract-standards",
  "near-sdk",
  "near-sdk-sim",

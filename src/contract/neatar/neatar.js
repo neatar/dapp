@@ -53,7 +53,7 @@ export class Neatar {
    * @returns {Promise<void>}
    */
   avatar_burn() {
-    return this.contract.avatar_burn()
+    return this.contract.avatar_burn({}, AVATAR_CREATE_PREPAID_GAS)
   }
 
   /**

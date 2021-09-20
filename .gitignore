@@ -1,4 +1,4 @@
 target
-neardev
+neardev*
 src/web/asset/icon
 build
