@@ -1,6 +1,5 @@
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
-use near_contract_standards::non_fungible_token::hash_account_id;
 use near_contract_standards::non_fungible_token::metadata::{
     NFTContractMetadata, NonFungibleTokenMetadataProvider, TokenMetadata, NFT_METADATA_SPEC,
 };
@@ -20,6 +19,28 @@ use near_sdk::{
 
 mod identicon;
 
+const PKG_NAME: &str = env!("CARGO_PKG_NAME");
+lazy_static_include::lazy_static_include_str! {
+    LOGO => "../../web/asset/logo.svg",
+}
+
+fn new_nft_metadata() -> NFTContractMetadata {
+    let metadata = NFTContractMetadata {
+        spec: NFT_METADATA_SPEC.to_string(),
+        name: PKG_NAME.to_uppercase(),
+        symbol: PKG_NAME.to_uppercase(),
+        icon: Some(format!(
+            "data:image/{}",
+            pack_data_image(LOGO.to_string(), None)
+        )),
+        base_uri: Some("data:image".to_string()),
+        reference: None,
+        reference_hash: None,
+    };
+    metadata.assert_valid();
+    metadata
+}
+
 fn pack_data_image(data: String, media_type: Option<String>) -> String {
     format!(
         "{};base64,{}",
@@ -28,23 +49,39 @@ fn pack_data_image(data: String, media_type: Option<String>) -> String {
     )
 }
 
+fn default_token() -> Token {
+    new_token(LOGO.to_string(), None)
+}
+
 fn new_token(svg: String, owner_id: Option<AccountId>) -> Token {
     let hash = Code::Sha2_256.digest(svg.as_bytes());
     let token_id = Cid::new_v1(RAW, hash).to_string();
     let owner_id = owner_id.unwrap_or_else(env::current_account_id);
     Token {
-        token_id,
+        token_id: token_id.clone(),
         owner_id,
-        metadata: Some(new_token_metadata(svg)),
+        metadata: Some(new_token_metadata(svg, token_id)),
         approved_account_ids: None,
     }
 }
 
-fn new_token_metadata(svg: String) -> TokenMetadata {
+fn new_token_metadata(svg: String, token_id: String) -> TokenMetadata {
+    let title = Some(format!(
+        "#{}",
+        if token_id.len() > 6 {
+            format!(
+                "{}...{}",
+                &token_id[0..3],
+                &token_id[token_id.len() - 4..token_id.len() - 1]
+            )
+        } else {
+            token_id
+        },
+    ));
     let media = pack_data_image(svg.clone(), None);
     let media_hash = Base64VecU8(env::sha256(svg.as_bytes()));
     TokenMetadata {
-        title: None,
+        title,
         description: None,
         media: Some(media),
         media_hash: Some(media_hash),
@@ -71,9 +108,6 @@ pub struct Neatar {
 }
 
 const RAW: u64 = 0x55;
-lazy_static_include::lazy_static_include_str! {
-    LOGO => "../../web/asset/logo.svg",
-}
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
@@ -103,22 +137,13 @@ impl Neatar {
                 Some(StorageKey::Enumeration),
                 Some(StorageKey::Approval),
             ),
-            metadata: LazyOption::new(
-                StorageKey::Metadata,
-                Some(&NFTContractMetadata {
-                    spec: NFT_METADATA_SPEC.to_string(),
-                    name: "The Web3 avatar".to_string(),
-                    symbol: "NEATAR".to_string(),
-                    icon: Some(format!(
-                        "data:image/{}",
-                        pack_data_image(LOGO.to_string(), None)
-                    )),
-                    base_uri: Some("data:image".to_string()),
-                    reference: None,
-                    reference_hash: None,
-                }),
-            ),
+            metadata: LazyOption::new(StorageKey::Metadata, Some(&new_nft_metadata())),
         }
+    }
+
+    #[private]
+    pub fn update_name(&mut self) {
+        self.metadata = LazyOption::new(StorageKey::Metadata, Some(&new_nft_metadata()))
     }
 
     #[private]
@@ -133,10 +158,7 @@ impl Neatar {
 
     fn current_token(&self, account_id: AccountId) -> Token {
         let list = self.token.nft_tokens_for_owner(account_id, None, None);
-        if list.is_empty() {
-            return new_token(LOGO.to_string(), None);
-        }
-        list.last().cloned().unwrap()
+        list.last().cloned().unwrap_or_else(default_token)
     }
 
     pub fn ft_burn(&mut self, token_id: TokenId) {
@@ -147,7 +169,6 @@ impl Neatar {
             .get(&token_id)
             .expect("Not found token");
         require!(owner_id == env::predecessor_account_id(), "Only owner");
-        // make burn token
         match self
             .token
             .tokens_per_owner
@@ -202,7 +223,8 @@ impl Neatar {
     #[private]
     pub fn avatar_create_for(&mut self, owner_id: AccountId) -> String {
         let initial_storage_usage = env::storage_usage();
-        let hash: &[u8] = &hash_account_id(&owner_id);
+        let hash: &[u8] =
+            &env::sha256(format!("{}-{}", owner_id, env::block_timestamp()).as_bytes());
         let svg = identicon::make(hash);
         let contract_id = env::current_account_id();
         let token = new_token(svg, None);
@@ -251,8 +273,6 @@ mod unit {
 
     const MINT_STORAGE_COST: u128 = 25900000000000000000000;
     // 0.0259
-    const TOKEN_ID: &str = "bafkreib5ry3rranl7tqov2uilfxbg4chuy6w2px3shlbchysqbubnu2vqu";
-    const AVATAR: &str = "svg+xml;base64,PHN2ZyB2aWV3Qm94PSItMzIgLTMyIDY0IDY0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxjaXJjbGUgY3g9IjAiIGN5PSIwIiBmaWxsPSIjZWVlZWVlIiByPSIzMiIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMCIgY3k9Ii0yNCIgZmlsbD0iIzIxNTRlZCIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMCIgY3k9Ii0xMiIgZmlsbD0iI2JmODlmNSIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iLTEwIiBjeT0iLTE4IiBmaWxsPSIjYTUwZDFkIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSItMjAiIGN5PSItMTIiIGZpbGw9IiM4N2VkMjEiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9Ii0xMCIgY3k9Ii02IiBmaWxsPSIjMGRhNTMzIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSItMjAiIGN5PSIwIiBmaWxsPSIjYTUwZDFkIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSItMjAiIGN5PSIxMiIgZmlsbD0iIzIxNTRlZCIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iLTEwIiBjeT0iNiIgZmlsbD0iI2JmODlmNSIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iLTEwIiBjeT0iMTgiIGZpbGw9IiM4OWY1ZjUiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjAiIGN5PSIyNCIgZmlsbD0iIzA2NDcwZiIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMCIgY3k9IjEyIiBmaWxsPSIjNDcyYTA2IiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIxMCIgY3k9IjE4IiBmaWxsPSIjMjY0NzA2IiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjEyIiBmaWxsPSIjMjUyMWVkIiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIxMCIgY3k9IjYiIGZpbGw9IiM0NzA2MWYiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iMCIgZmlsbD0iIzI2NDcwNiIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSItMTIiIGZpbGw9IiMwNjQ3MGYiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iLTYiIGZpbGw9IiM0NzJhMDYiIHI9IjUiIHN0cm9rZT0ibm9uZSIvPjxjaXJjbGUgY3g9IjEwIiBjeT0iLTE4IiBmaWxsPSIjODlmNWY1IiByPSI1IiBzdHJva2U9Im5vbmUiLz48Y2lyY2xlIGN4PSIwIiBjeT0iMCIgZmlsbD0iIzA2NDcyZSIgcj0iNSIgc3Ryb2tlPSJub25lIi8+PC9zdmc+";
 
     fn get_context(predecessor_account_id: AccountId) -> VMContextBuilder {
         let mut builder = VMContextBuilder::new();
@@ -294,12 +314,17 @@ mod unit {
             .build());
 
         let avatar = contract.avatar_create();
-        assert_eq!(avatar, AVATAR);
+        assert_eq!(1071, avatar.len());
 
-        let token = contract.nft_token(TOKEN_ID.to_string()).unwrap();
+        let token = contract
+            .nft_tokens_for_owner(accounts(0), None, None)
+            .first()
+            .cloned()
+            .unwrap();
         assert_eq!(token.owner_id, accounts(0));
-        let avatar = token.metadata.unwrap().media.unwrap();
-        assert_eq!(avatar, AVATAR);
+        let metadata = token.metadata.unwrap();
+        assert_eq!(1071, metadata.media.clone().unwrap().len());
+        assert_eq!(10, metadata.title.unwrap().len());
         assert_eq!(token.approved_account_ids.unwrap().len(), 0);
     }
 
@@ -316,8 +341,8 @@ mod unit {
             .signer_account_id(accounts(0))
             .build());
 
-        assert_eq!(AVATAR, contract.avatar_create());
-        assert_eq!(1722, contract.avatar_of(accounts(0)).len());
+        contract.avatar_create();
+        assert_eq!(1082, contract.avatar_of(accounts(0)).len());
         contract.avatar_burn();
         assert_eq!(614, contract.avatar_of(accounts(0)).len());
     }
@@ -334,13 +359,19 @@ mod unit {
             .predecessor_account_id(accounts(0))
             .build());
         contract.avatar_create();
+        let token_id = contract
+            .nft_tokens_for_owner(accounts(0), None, None)
+            .first()
+            .cloned()
+            .unwrap()
+            .token_id;
 
         testing_env!(context
             .storage_usage(env::storage_usage())
             .attached_deposit(1)
             .predecessor_account_id(accounts(0))
             .build());
-        contract.nft_transfer(accounts(1), TOKEN_ID.to_string(), None, None);
+        contract.nft_transfer(accounts(1), token_id.clone(), None, None);
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -348,10 +379,10 @@ mod unit {
             .is_view(true)
             .attached_deposit(0)
             .build());
-        if let Some(token) = contract.nft_token(TOKEN_ID.to_string()) {
-            assert_eq!(token.token_id, TOKEN_ID.to_string());
+        if let Some(token) = contract.nft_token(token_id.clone()) {
+            assert_eq!(token.token_id, token_id);
             assert_eq!(token.owner_id, accounts(1));
-            assert_eq!(token.metadata.unwrap().media.unwrap().len(), 1711);
+            assert_eq!(token.metadata.unwrap().media.unwrap().len(), 1071);
             assert_eq!(token.approved_account_ids.unwrap(), HashMap::new());
         } else {
             panic!("token not correctly created, or not found by nft_token");
@@ -370,14 +401,18 @@ mod unit {
             .predecessor_account_id(accounts(0))
             .build());
         contract.avatar_create();
-
+        let token = contract
+            .nft_tokens_for_owner(accounts(0), None, None)
+            .first()
+            .cloned()
+            .unwrap();
         // alice approves bob
         testing_env!(context
             .storage_usage(env::storage_usage())
             .attached_deposit(150000000000000000000)
             .predecessor_account_id(accounts(0))
             .build());
-        contract.nft_approve(TOKEN_ID.to_string(), accounts(1), None);
+        contract.nft_approve(token.token_id.clone(), accounts(1), None);
 
         testing_env!(context
             .storage_usage(env::storage_usage())
@@ -385,7 +420,7 @@ mod unit {
             .is_view(true)
             .attached_deposit(0)
             .build());
-        assert!(contract.nft_is_approved(TOKEN_ID.to_string(), accounts(1), Some(1)));
+        assert!(contract.nft_is_approved(token.token_id, accounts(1), Some(1)));
     }
 
     #[test]
@@ -400,14 +435,18 @@ mod unit {
             .predecessor_account_id(accounts(0))
             .build());
         contract.avatar_create();
-
+        let token = contract
+            .nft_tokens_for_owner(accounts(0), None, None)
+            .first()
+            .cloned()
+            .unwrap();
         // alice approves bob
         testing_env!(context
             .storage_usage(env::storage_usage())
             .attached_deposit(150000000000000000000)
             .predecessor_account_id(accounts(0))
             .build());
-        contract.nft_approve(TOKEN_ID.to_string(), accounts(1), None);
+        contract.nft_approve(token.token_id.clone(), accounts(1), None);
 
         // alice revokes bob
         testing_env!(context
@@ -415,14 +454,14 @@ mod unit {
             .attached_deposit(1)
             .predecessor_account_id(accounts(0))
             .build());
-        contract.nft_revoke(TOKEN_ID.to_string(), accounts(1));
+        contract.nft_revoke(token.token_id.clone(), accounts(1));
         testing_env!(context
             .storage_usage(env::storage_usage())
             .account_balance(env::account_balance())
             .is_view(true)
             .attached_deposit(0)
             .build());
-        assert!(!contract.nft_is_approved(TOKEN_ID.to_string(), accounts(1), None));
+        assert!(!contract.nft_is_approved(token.token_id, accounts(1), None));
     }
 
     #[test]
@@ -437,14 +476,18 @@ mod unit {
             .predecessor_account_id(accounts(0))
             .build());
         contract.avatar_create();
-
+        let token = contract
+            .nft_tokens_for_owner(accounts(0), None, None)
+            .first()
+            .cloned()
+            .unwrap();
         // alice approves bob
         testing_env!(context
             .storage_usage(env::storage_usage())
             .attached_deposit(150000000000000000000)
             .predecessor_account_id(accounts(0))
             .build());
-        contract.nft_approve(TOKEN_ID.to_string(), accounts(1), None);
+        contract.nft_approve(token.token_id.clone(), accounts(1), None);
 
         // alice revokes bob
         testing_env!(context
@@ -452,13 +495,13 @@ mod unit {
             .attached_deposit(1)
             .predecessor_account_id(accounts(0))
             .build());
-        contract.nft_revoke_all(TOKEN_ID.to_string());
+        contract.nft_revoke_all(token.token_id.clone());
         testing_env!(context
             .storage_usage(env::storage_usage())
             .account_balance(env::account_balance())
             .is_view(true)
             .attached_deposit(0)
             .build());
-        assert!(!contract.nft_is_approved(TOKEN_ID.to_string(), accounts(1), Some(1)));
+        assert!(!contract.nft_is_approved(token.token_id, accounts(1), Some(1)));
     }
 }

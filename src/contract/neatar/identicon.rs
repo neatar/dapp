@@ -102,18 +102,18 @@ fn rgba_to_hex(rgba_color: [u8; 4]) -> String {
 fn position_circle_set(a: i32) -> Vec<CirclePosition> {
     let b = ((a as f64) * 3f64.sqrt() / 2.0).round() as i32;
     vec![
-        CirclePosition {
-            x_center: 0,
-            y_center: -2 * a,
-        },
-        CirclePosition {
-            x_center: 0,
-            y_center: -a,
-        },
-        CirclePosition {
-            x_center: -b,
-            y_center: -3 * a / 2,
-        },
+        // CirclePosition {
+        //     x_center: 0,
+        //     y_center: -2 * a,
+        // },
+        // CirclePosition {
+        //     x_center: 0,
+        //     y_center: -a,
+        // },
+        // CirclePosition {
+        //     x_center: -b,
+        //     y_center: -3 * a / 2,
+        // },
         CirclePosition {
             x_center: -2 * b,
             y_center: -a,
@@ -134,22 +134,22 @@ fn position_circle_set(a: i32) -> Vec<CirclePosition> {
             x_center: -b,
             y_center: a / 2,
         },
-        CirclePosition {
-            x_center: -b,
-            y_center: 3 * a / 2,
-        },
-        CirclePosition {
-            x_center: 0,
-            y_center: 2 * a,
-        },
-        CirclePosition {
-            x_center: 0,
-            y_center: a,
-        },
-        CirclePosition {
-            x_center: b,
-            y_center: 3 * a / 2,
-        },
+        // CirclePosition {
+        //     x_center: -b,
+        //     y_center: 3 * a / 2,
+        // },
+        // CirclePosition {
+        //     x_center: 0,
+        //     y_center: 2 * a,
+        // },
+        // CirclePosition {
+        //     x_center: 0,
+        //     y_center: a,
+        // },
+        // CirclePosition {
+        //     x_center: b,
+        //     y_center: 3 * a / 2,
+        // },
         CirclePosition {
             x_center: 2 * b,
             y_center: a,
@@ -170,10 +170,10 @@ fn position_circle_set(a: i32) -> Vec<CirclePosition> {
             x_center: b,
             y_center: -a / 2,
         },
-        CirclePosition {
-            x_center: b,
-            y_center: -3 * a / 2,
-        },
+        // CirclePosition {
+        //     x_center: b,
+        //     y_center: -3 * a / 2,
+        // },
         CirclePosition {
             x_center: 0,
             y_center: 0,
@@ -328,12 +328,12 @@ pub fn get_colors_from_vec(into_id: &[u8]) -> Vec<[u8; 4]> {
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
-mod tests {
+mod unit {
     use crate::identicon::make;
 
     #[test]
     fn test_make() {
         let actual = make(&[1]);
-        assert_eq!("<svg viewBox=\"-32 -32 64 64\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"0\" cy=\"0\" fill=\"#eeeeee\" r=\"32\" stroke=\"none\"/><circle cx=\"0\" cy=\"-24\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"-12\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"-18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"-12\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"-6\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"0\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"12\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"6\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"24\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"12\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"12\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"6\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"0\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"-12\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"-6\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"-18\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"0\" fill=\"#5e3c77\" r=\"5\" stroke=\"none\"/></svg>", actual);
+        assert_eq!("<svg viewBox=\"-32 -32 64 64\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"0\" cy=\"0\" fill=\"#eeeeee\" r=\"32\" stroke=\"none\"/><circle cx=\"-20\" cy=\"-12\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"-6\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"0\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"-20\" cy=\"12\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"-10\" cy=\"6\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"12\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"6\" fill=\"#d4aabf\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"0\" fill=\"#d4caaa\" r=\"5\" stroke=\"none\"/><circle cx=\"20\" cy=\"-12\" fill=\"#3d3c77\" r=\"5\" stroke=\"none\"/><circle cx=\"10\" cy=\"-6\" fill=\"#77623c\" r=\"5\" stroke=\"none\"/><circle cx=\"0\" cy=\"0\" fill=\"#af7560\" r=\"5\" stroke=\"none\"/></svg>", actual);
     }
 }
