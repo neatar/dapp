@@ -9,7 +9,10 @@
   </p>
 </div>
 
-# Docs API 
+# Docs API
+
+See an example of integration for a third-party service: https://replit.com/@neatar/demo#index.html
+
 ## Getting avatar
 
 ```http request
@@ -31,7 +34,7 @@ Content-Type: application/json
 ```shell
 curl https://rest.nearapi.org/view -H 'content-type: application/json' \
 --data-raw '{
-  "contract": "dev-1632083448233-46360154416655",
+  "contract": "dev-1632421165549-72227267439222",
   "method": "avatar_of",
   "params": {
     "account_id": "ilyar.testnet"
