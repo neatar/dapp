@@ -20,7 +20,7 @@ POST https://rest.nearapi.org/view
 Content-Type: application/json
 
 {
-  "contract": "dev-1632421165549-72227267439222",
+  "contract": "alpha.neatar.testnet",
   "method": "avatar_of",
   "params": {
     "account_id": "ilyar.testnet"
@@ -34,7 +34,7 @@ Content-Type: application/json
 ```shell
 curl https://rest.nearapi.org/view -H 'content-type: application/json' \
 --data-raw '{
-  "contract": "dev-1632421165549-72227267439222",
+  "contract": "alpha.neatar.testnet",
   "method": "avatar_of",
   "params": {
     "account_id": "ilyar.testnet"

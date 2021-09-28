@@ -15,7 +15,7 @@ export function config(env) {
       return {
         networkId: 'testnet',
         nodeUrl: 'https://rpc.testnet.near.org',
-        contractName: 'dev-1632421165549-72227267439222',
+        contractName: 'alpha.neatar.testnet',
         walletUrl: 'https://wallet.testnet.near.org',
         helperUrl: 'https://helper.testnet.near.org',
         explorerUrl: 'https://explorer.testnet.near.org',

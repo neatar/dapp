@@ -26,6 +26,9 @@ const innerText = (text) => (elem) => {
 const disabled = (status) => (elem) => {
   elem.disabled = status
 }
+const addClass = (name) => (elem) => {
+  elem.classList.add(name);
+}
 
 behavior('login', onclick(login))
 behavior('logout', onclick(logout))
@@ -61,22 +64,18 @@ function signedOutFlow() {
   return updateAvatar()
 }
 
-let icon
-
 async function updateAvatar() {
-  if (!icon) {
-    icon = (await contract().nft_metadata()).icon
-  }
   const avatar = await contract().avatar_of(accountId())
   behavior('avatar',elem => {
     elem.src = avatar
   })
-  if (avatar === icon) {
-    behavior('action-burn', hide())
-    behavior('action-create', show())
-  } else {
+  if ((await contract().avatar_exist(accountId()))) {
     behavior('action-burn', show())
     behavior('action-create', hide())
+  } else {
+    behavior('action-burn', hide())
+    behavior('action-create', show())
+    behavior('avatar', addClass('avatar_default'))
   }
 }
 

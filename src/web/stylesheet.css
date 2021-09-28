@@ -33,3 +33,7 @@ body {
 [data-behavior^=action] {
   text-transform: uppercase;
 }
+
+.avatar_default {
+  filter: grayscale(1);
+}

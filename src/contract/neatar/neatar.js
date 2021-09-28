@@ -13,6 +13,8 @@ export class Neatar {
     this.contract = new Contract(account, contractId, {
       viewMethods: [
         'avatar_of',
+        'avatar_exist',
+        'nft_tokens_for_owner',
         'nft_metadata',
       ],
       changeMethods: [
@@ -61,5 +63,27 @@ export class Neatar {
    */
   nft_metadata() {
     return this.contract.nft_metadata()
+  }
+
+  /**
+   * @param {string} account_id
+   * @returns {Promise<bolean>}
+   */
+  avatar_exist(account_id) {
+    return this.contract.avatar_exist({account_id})
+  }
+
+  /**
+   * @param {string} account_id
+   * @param {string} from_index
+   * @param {number} limit
+   * @returns {Promise<Object[]>}
+   */
+  nft_tokens_for_owner(account_id, from_index = "0", limit = 50) {
+    return this.contract.nft_tokens_for_owner({
+      account_id,
+      from_index,
+      limit,
+    })
   }
 }
