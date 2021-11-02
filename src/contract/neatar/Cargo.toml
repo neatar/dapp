@@ -19,17 +19,15 @@ doc = false
 [dependencies]
 lazy_static = "1.4.0"
 lazy-static-include = "3.1.1"
-near-sdk = "4.0.0-pre.2"
-near-contract-standards = "4.0.0-pre.2"
+near-sdk = "4.0.0-pre.4"
+near-contract-standards = "4.0.0-pre.4"
 cid = "0.7.0"
 hex = "0.4.3"
-png = "0.16.8"
-blake2-rfc = "0.2.18"
 palette = "0.6.0"
-base58 = "0.1.0"
 svg = "0.10.0"
 anyhow = "1.0.42"
 base64 = "0.13.0"
+blake2-rfc = "0.2.18"
 
 [dev-dependencies]
-near-sdk-sim = "4.0.0-pre.2"
+near-sdk-sim = "4.0.0-pre.4"

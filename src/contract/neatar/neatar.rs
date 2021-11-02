@@ -231,9 +231,8 @@ impl Neatar {
         let token_id = token.token_id;
         let metadata = token.metadata.unwrap();
         let media = metadata.media.clone().unwrap_or_default();
-        self.token.owner_id = env::predecessor_account_id(); // FIXME
         self.token
-            .mint(token_id.clone(), contract_id.clone(), Some(metadata));
+            .internal_mint(token_id.clone(), contract_id.clone(), Some(metadata));
         env::promise_create(
             contract_id,
             "nft_transfer",
